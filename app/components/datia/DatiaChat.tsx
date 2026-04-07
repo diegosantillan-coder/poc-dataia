@@ -54,11 +54,19 @@ export function DatiaChat() {
     saveSession(sessionIdRef.current, messages);
   }, [messages, saveSession]);
 
-  // When stopping the mic (was recording → idle) show thinking indicator
+  // When stopping the mic (was recording → idle) show thinking indicator.
+  // This covers BOTH manual toggle AND VAD auto-stop (which bypasses voiceToggle).
+  const prevVoiceStatusRef = useRef(voiceStatus);
+  useEffect(() => {
+    if (prevVoiceStatusRef.current === "recording" && voiceStatus === "idle") {
+      setIsThinking(true);
+    }
+    prevVoiceStatusRef.current = voiceStatus;
+  }, [voiceStatus]);
+
   const voiceToggle = useCallback(async () => {
-    if (voiceStatus === "recording") setIsThinking(true);
     await voiceToggleRaw();
-  }, [voiceStatus, voiceToggleRaw]);
+  }, [voiceToggleRaw]);
 
   const handleSubmit = (text: string) => {
     const trimmed = text.trim();
@@ -94,6 +102,9 @@ export function DatiaChat() {
         sessions={sessions}
         onLoadSession={handleLoadSession}
         onDeleteSession={deleteSession}
+        voiceStatus={voiceStatus}
+        onVoiceToggle={voiceToggle}
+        onVoiceConnect={voiceConnect}
       />
     );
   }

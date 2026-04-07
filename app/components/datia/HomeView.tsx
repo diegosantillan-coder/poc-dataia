@@ -1,6 +1,7 @@
 import { DatiaLogo } from "./icons";
 import { ChatInput } from "./ChatInput";
 import type { Session } from "./types";
+import type { VoiceStatus } from "./useVoiceChat";
 
 const QUICK_ACTIONS = ["Aprender algo nuevo", "Realizar un assessment", "Crear una estrategia"];
 
@@ -11,6 +12,9 @@ interface HomeViewProps {
   sessions?: Session[];
   onLoadSession?: (id: string) => void;
   onDeleteSession?: (id: string) => void;
+  voiceStatus?: VoiceStatus;
+  onVoiceToggle?: () => void;
+  onVoiceConnect?: () => void;
 }
 
 function formatDate(iso: string): string {
@@ -18,7 +22,7 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
 }
 
-export function HomeView({ input, onInputChange, onSubmit, sessions = [], onLoadSession, onDeleteSession }: HomeViewProps) {
+export function HomeView({ input, onInputChange, onSubmit, sessions = [], onLoadSession, onDeleteSession, voiceStatus, onVoiceToggle, onVoiceConnect }: HomeViewProps) {
   return (
     <div
       className="relative flex flex-col h-screen w-screen overflow-hidden"
@@ -45,7 +49,14 @@ export function HomeView({ input, onInputChange, onSubmit, sessions = [], onLoad
 
           {/* Input box */}
           <div className="w-full">
-            <ChatInput value={input} onChange={onInputChange} onSubmit={onSubmit} />
+            <ChatInput
+              value={input}
+              onChange={onInputChange}
+              onSubmit={onSubmit}
+              voiceStatus={voiceStatus}
+              onVoiceToggle={onVoiceToggle}
+              onVoiceConnect={onVoiceConnect}
+            />
           </div>
 
           {/* Quick action pills */}
