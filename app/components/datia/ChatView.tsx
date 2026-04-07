@@ -9,11 +9,12 @@ interface ChatViewProps {
   onInputChange: (v: string) => void;
   onSubmit: (text: string) => void;
   voiceStatus?: VoiceStatus;
+  interimTranscript?: string;
   onVoiceToggle?: () => void;
   onVoiceConnect?: () => void;
 }
 
-export function ChatView({ messages, input, onInputChange, onSubmit, voiceStatus, onVoiceToggle, onVoiceConnect }: ChatViewProps) {
+export function ChatView({ messages, input, onInputChange, onSubmit, voiceStatus, interimTranscript, onVoiceToggle, onVoiceConnect }: ChatViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,6 +66,46 @@ export function ChatView({ messages, input, onInputChange, onSubmit, voiceStatus
             </div>
           )
         )}
+
+        {/* Ghost bubble — live interim transcript while recording */}
+        {interimTranscript && (
+          <div className="flex justify-end">
+            <div
+              className="text-white"
+              style={{
+                background: "rgba(255, 255, 255, 0.10)",
+                border: "1px dashed rgba(255,255,255,0.25)",
+                borderRadius: "32px",
+                padding: "24px",
+                maxWidth: "709px",
+                fontFamily: "var(--font-poppins), sans-serif",
+                fontSize: "26px",
+                fontWeight: 400,
+                lineHeight: "1.2",
+                opacity: 0.7,
+                fontStyle: "italic",
+              }}
+            >
+              {interimTranscript}
+              <span
+                style={{
+                  display: "inline-block",
+                  width: "2px",
+                  height: "1em",
+                  background: "rgba(255,255,255,0.7)",
+                  marginLeft: "4px",
+                  verticalAlign: "text-bottom",
+                  animation: "caretBlink 1s step-end infinite",
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        <style>{`
+          @keyframes caretBlink { 0%,100%{opacity:1} 50%{opacity:0} }
+        `}</style>
+
         <div ref={bottomRef} />
       </div>
 

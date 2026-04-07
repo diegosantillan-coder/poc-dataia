@@ -17,7 +17,7 @@ export function DatiaChat() {
     setMessages((prev) => [...prev, msg]);
   }, []);
 
-  const { status: voiceStatus, connect: voiceConnect, toggleMic: voiceToggle } =
+  const { status: voiceStatus, interimTranscript, connect: voiceConnect, toggleMic: voiceToggle } =
     useVoiceChat({ onMessage: addMessage });
 
   const handleSubmit = (text: string) => {
@@ -60,6 +60,7 @@ export function DatiaChat() {
         onInputChange={setInput}
         onSubmit={handleSubmit}
         voiceStatus={voiceStatus}
+        interimTranscript={interimTranscript}
         onVoiceToggle={voiceToggle}
         onVoiceConnect={voiceConnect}
       />
