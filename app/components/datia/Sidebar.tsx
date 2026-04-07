@@ -33,7 +33,7 @@ export function Sidebar({ onNewChat }: SidebarProps) {
         <button
           type="button"
           onClick={onNewChat}
-          className="flex items-center gap-3 text-white w-full text-left transition-opacity hover:opacity-70"
+          className="flex items-center gap-3 text-white w-full text-left transition-opacity hover:opacity-70 cursor-pointer"
           style={{
             fontFamily: "var(--font-poppins), sans-serif",
             fontSize: "20px",
@@ -46,7 +46,7 @@ export function Sidebar({ onNewChat }: SidebarProps) {
 
         <button
           type="button"
-          className="flex items-center gap-3 text-white w-full text-left transition-opacity hover:opacity-70"
+          className="flex items-center gap-3 text-white w-full text-left transition-opacity hover:opacity-70 cursor-pointer"
           style={{
             fontFamily: "var(--font-poppins), sans-serif",
             fontSize: "20px",
@@ -92,7 +92,7 @@ export function Sidebar({ onNewChat }: SidebarProps) {
       <button
         type="button"
         onClick={onNewChat}
-        className="flex items-center gap-3 text-white transition-opacity hover:opacity-70"
+        className="flex items-center gap-3 text-white transition-opacity hover:opacity-70 cursor-pointer"
         style={{
           fontFamily: "var(--font-poppins), sans-serif",
           fontSize: "16px",

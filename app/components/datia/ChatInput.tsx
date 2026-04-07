@@ -2,14 +2,26 @@
 
 import { useRef, useEffect } from "react";
 import { PlusIcon } from "./icons";
+import { VoiceMicButton } from "./VoiceMicButton";
+import type { VoiceStatus } from "./useVoiceChat";
 
 interface ChatInputProps {
   value: string;
   onChange: (v: string) => void;
   onSubmit: (text: string) => void;
+  voiceStatus?: VoiceStatus;
+  onVoiceToggle?: () => void;
+  onVoiceConnect?: () => void;
 }
 
-export function ChatInput({ value, onChange, onSubmit }: ChatInputProps) {
+export function ChatInput({
+  value,
+  onChange,
+  onSubmit,
+  voiceStatus = "disconnected",
+  onVoiceToggle,
+  onVoiceConnect,
+}: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -67,6 +79,17 @@ export function ChatInput({ value, onChange, onSubmit }: ChatInputProps) {
             caretColor: "white",
           }}
         />
+
+        {/* Mic button — right side, only rendered when voice handlers provided */}
+        {onVoiceToggle && onVoiceConnect && (
+          <div className="flex-shrink-0 mb-1">
+            <VoiceMicButton
+              status={voiceStatus}
+              onToggle={onVoiceToggle}
+              onConnect={onVoiceConnect}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

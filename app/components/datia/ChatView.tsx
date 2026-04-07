@@ -1,15 +1,19 @@
 import { useEffect, useRef } from "react";
 import { ChatInput } from "./ChatInput";
 import type { Message } from "./types";
+import type { VoiceStatus } from "./useVoiceChat";
 
 interface ChatViewProps {
   messages: Message[];
   input: string;
   onInputChange: (v: string) => void;
   onSubmit: (text: string) => void;
+  voiceStatus?: VoiceStatus;
+  onVoiceToggle?: () => void;
+  onVoiceConnect?: () => void;
 }
 
-export function ChatView({ messages, input, onInputChange, onSubmit }: ChatViewProps) {
+export function ChatView({ messages, input, onInputChange, onSubmit, voiceStatus, onVoiceToggle, onVoiceConnect }: ChatViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,8 +69,15 @@ export function ChatView({ messages, input, onInputChange, onSubmit }: ChatViewP
       </div>
 
       {/* Input bar — width:819 matching Figma layout_AWSYR7 */}
-      <div style={{ width: "819px" }}>
-        <ChatInput value={input} onChange={onInputChange} onSubmit={onSubmit} />
+      <div style={{ width: "819px", paddingBottom: "8px" }}>
+        <ChatInput
+          value={input}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          voiceStatus={voiceStatus}
+          onVoiceToggle={onVoiceToggle}
+          onVoiceConnect={onVoiceConnect}
+        />
       </div>
     </div>
   );

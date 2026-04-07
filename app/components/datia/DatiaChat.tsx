@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { HomeView } from "./HomeView";
 import { ChatView } from "./ChatView";
 import { Sidebar } from "./Sidebar";
+import { useVoiceChat } from "./useVoiceChat";
 import type { Message } from "./types";
 
 export type { Message };
@@ -12,10 +13,16 @@ export function DatiaChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
 
+  const addMessage = useCallback((msg: Message) => {
+    setMessages((prev) => [...prev, msg]);
+  }, []);
+
+  const { status: voiceStatus, connect: voiceConnect, toggleMic: voiceToggle } =
+    useVoiceChat({ onMessage: addMessage });
+
   const handleSubmit = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-
     setMessages((prev) => [
       ...prev,
       { role: "user", content: trimmed },
@@ -52,6 +59,9 @@ export function DatiaChat() {
         input={input}
         onInputChange={setInput}
         onSubmit={handleSubmit}
+        voiceStatus={voiceStatus}
+        onVoiceToggle={voiceToggle}
+        onVoiceConnect={voiceConnect}
       />
     </div>
   );
