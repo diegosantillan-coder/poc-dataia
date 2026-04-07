@@ -27,6 +27,8 @@ function makeAudioPlayer(
   const queue: ArrayBuffer[] = [];
   let isPlaying = false;
   let nextPlayTime = 0;
+  let muted = false;
+  const activeSources: AudioBufferSourceNode[] = [];
 
   function playNext() {
     if (queue.length === 0) {
@@ -47,7 +49,12 @@ function makeAudioPlayer(
       source.connect(playbackCtx.destination);
       const startAt = Math.max(playbackCtx.currentTime, nextPlayTime);
       nextPlayTime = startAt + audioBuffer.duration;
-      source.onended = () => playNext();
+      source.onended = () => {
+        const idx = activeSources.indexOf(source);
+        if (idx !== -1) activeSources.splice(idx, 1);
+        playNext();
+      };
+      activeSources.push(source);
       source.start(startAt);
     } catch {
       playNext();
@@ -56,8 +63,23 @@ function makeAudioPlayer(
 
   return {
     enqueue(buf: ArrayBuffer) {
+      if (muted) return; // user stopped — discard incoming chunks
       queue.push(buf);
       if (!isPlaying) playNext();
+    },
+    stop() {
+      muted = true;
+      queue.length = 0;
+      nextPlayTime = 0;
+      for (const src of activeSources) {
+        try { src.onended = null; src.stop(); } catch { /* already stopped */ }
+      }
+      activeSources.length = 0;
+      isPlaying = false;
+      onIdle();
+    },
+    unmute() {
+      muted = false;
     },
   };
 }
@@ -149,6 +171,8 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
     textModeRef.current = false;
     // Reset bubble tracker for this new voice turn
     hasUserBubbleRef.current = false;
+    // Unmute so the next response plays
+    audioPlayerRef.current?.unmute();
     try {
       const captureCtx = new AudioContext({ sampleRate: 16000 });
       captureCtxRef.current = captureCtx;
@@ -254,11 +278,17 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
     const trimmed = text.trim();
     if (!trimmed || !sessionReadyRef.current) return;
     textModeRef.current = true;
+    // Unmute in case user had stopped audio previously
+    audioPlayerRef.current?.unmute();
     onMessage({ role: "user", content: trimmed });
     socketRef.current?.send(JSON.stringify({ type: "text_message", text: trimmed }));
   }, [onMessage]);
 
-  return { status, error, connect, disconnect, toggleMic, endSession, sendText, sessionReady: sessionReadyRef };
+  const stopAudio = useCallback(() => {
+    audioPlayerRef.current?.stop();
+  }, []);
+
+  return { status, error, connect, disconnect, toggleMic, endSession, sendText, stopAudio, sessionReady: sessionReadyRef };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────

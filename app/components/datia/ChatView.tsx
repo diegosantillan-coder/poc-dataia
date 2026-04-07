@@ -15,11 +15,12 @@ interface ChatViewProps {
   voiceStatus?: VoiceStatus;
   onVoiceToggle?: () => void;
   onVoiceConnect?: () => void;
+  onStopAudio?: () => void;
   isThinking?: boolean;
   onMenuOpen?: () => void;
 }
 
-export function ChatView({ messages, input, onInputChange, onSubmit, voiceStatus, onVoiceToggle, onVoiceConnect, isThinking, onMenuOpen }: ChatViewProps) {
+export function ChatView({ messages, input, onInputChange, onSubmit, voiceStatus, onVoiceToggle, onVoiceConnect, onStopAudio, isThinking, onMenuOpen }: ChatViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export function ChatView({ messages, input, onInputChange, onSubmit, voiceStatus
             voiceStatus={voiceStatus}
             onVoiceToggle={onVoiceToggle}
             onVoiceConnect={onVoiceConnect}
+            onStopAudio={onStopAudio}
           />
         </div>
       </div>

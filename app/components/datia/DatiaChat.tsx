@@ -37,7 +37,7 @@ export function DatiaChat() {
     });
   }, []);
 
-  const { status: voiceStatus, connect: voiceConnect, toggleMic: voiceToggleRaw, sendText } =
+  const { status: voiceStatus, connect: voiceConnect, toggleMic: voiceToggleRaw, sendText, stopAudio } =
     useVoiceChat({ onMessage: addMessage, onUpdateLastUserMessage: updateLastUserMessage });
 
   // Connect to WS on mount
@@ -125,6 +125,7 @@ export function DatiaChat() {
         onVoiceConnect={voiceConnect}
         isThinking={isThinking}
         onMenuOpen={() => setSidebarOpen(true)}
+        onStopAudio={stopAudio}
       />
     </div>
   );

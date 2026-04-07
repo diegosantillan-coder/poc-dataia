@@ -12,6 +12,7 @@ interface ChatInputProps {
   voiceStatus?: VoiceStatus;
   onVoiceToggle?: () => void;
   onVoiceConnect?: () => void;
+  onStopAudio?: () => void;
 }
 
 export function ChatInput({
@@ -21,6 +22,7 @@ export function ChatInput({
   voiceStatus = "disconnected",
   onVoiceToggle,
   onVoiceConnect,
+  onStopAudio,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -83,6 +85,7 @@ export function ChatInput({
               status={voiceStatus}
               onToggle={onVoiceToggle}
               onConnect={onVoiceConnect}
+              onStopAudio={onStopAudio}
             />
           </div>
         )}
