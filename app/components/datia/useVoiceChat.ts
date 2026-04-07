@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Message } from "./types";
 
-const WS_URL = "ws://localhost:8080/ws";
+const WS_URL = "wss://d2lgnf5ksfosob.cloudfront.net/ws";
 
 export type VoiceStatus =
   | "disconnected"
@@ -130,15 +130,39 @@ export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       streamRef.current = stream;
 
+      // Buffer ~512 ms of audio (8192 samples at 16 kHz) before sending so
+      // whole spoken phrases stay in one chunk and brief pauses don't trigger
+      // premature end-of-utterance detection on the server.
+      // A 'flush' message drains whatever remains when the mic is stopped.
       const processorCode = [
         "class PCMProcessor extends AudioWorkletProcessor {",
+        "  constructor() {",
+        "    super();",
+        "    this._buf = []; this._len = 0;",
+        "    this.port.onmessage = (e) => {",
+        "      if (e.data === 'flush' && this._len > 0) {",
+        "        const out = new Int16Array(this._len);",
+        "        let off = 0;",
+        "        for (const c of this._buf) { out.set(c, off); off += c.length; }",
+        "        this.port.postMessage(out.buffer, [out.buffer]);",
+        "        this._buf = []; this._len = 0;",
+        "      }",
+        "    };",
+        "  }",
         "  process(inputs) {",
         "    const ch = inputs[0] && inputs[0][0];",
         "    if (ch) {",
         "      const i16 = new Int16Array(ch.length);",
         "      for (let i = 0; i < ch.length; i++)",
         "        i16[i] = Math.max(-32768, Math.min(32767, ch[i] * 32768));",
-        "      this.port.postMessage(i16.buffer, [i16.buffer]);",
+        "      this._buf.push(i16); this._len += ch.length;",
+        "      if (this._len >= 8192) {",
+        "        const out = new Int16Array(this._len);",
+        "        let off = 0;",
+        "        for (const c of this._buf) { out.set(c, off); off += c.length; }",
+        "        this.port.postMessage(out.buffer, [out.buffer]);",
+        "        this._buf = []; this._len = 0;",
+        "      }",
         "    }",
         "    return true;",
         "  }",
@@ -173,8 +197,14 @@ export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
   }, []);
 
   const stopRecording = useCallback(async () => {
-    workletRef.current?.disconnect();
-    workletRef.current = null;
+    // Flush any buffered audio that hasn't reached the chunk threshold yet
+    if (workletRef.current) {
+      workletRef.current.port.postMessage("flush");
+      // Give the worklet one render quantum (~3 ms) to emit the flush
+      await new Promise((r) => setTimeout(r, 50));
+      workletRef.current.disconnect();
+      workletRef.current = null;
+    }
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     await captureCtxRef.current?.close();
@@ -194,7 +224,14 @@ export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
     disconnect();
   }, [status, stopRecording, disconnect]);
 
-  return { status, error, connect, disconnect, toggleMic, endSession, sessionReady: sessionReadyRef };
+  const sendText = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || !sessionReadyRef.current) return;
+    onMessage({ role: "user", content: trimmed });
+    socketRef.current?.send(JSON.stringify({ type: "text_message", text: trimmed }));
+  }, [onMessage]);
+
+  return { status, error, connect, disconnect, toggleMic, endSession, sendText, sessionReady: sessionReadyRef };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────

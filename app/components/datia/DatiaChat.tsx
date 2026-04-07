@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { HomeView } from "./HomeView";
 import { ChatView } from "./ChatView";
 import { Sidebar } from "./Sidebar";
@@ -17,21 +17,18 @@ export function DatiaChat() {
     setMessages((prev) => [...prev, msg]);
   }, []);
 
-  const { status: voiceStatus, connect: voiceConnect, toggleMic: voiceToggle } =
+  const { status: voiceStatus, connect: voiceConnect, toggleMic: voiceToggle, sendText } =
     useVoiceChat({ onMessage: addMessage });
+
+  // Connect to WS on mount
+  useEffect(() => {
+    voiceConnect();
+  }, [voiceConnect]);
 
   const handleSubmit = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: trimmed },
-      {
-        role: "assistant",
-        content:
-          "Claro — te ayudo a estructurar un assessment de gobierno de datos sólido, accionable y adaptado a una organización como Pragma (consultoría/tecnología).\n\nLa idea es que puedas usarlo tanto para diagnóstico interno como para clientes.\nVoy a darte un framework completo: dimensiones, preguntas, niveles de madurez y entregables.",
-      },
-    ]);
+    sendText(trimmed);
     setInput("");
   };
 
