@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Message } from "./types";
 
 const WS_URL = "wss://d2lgnf5ksfosob.cloudfront.net/ws";
@@ -94,6 +94,13 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const audioPlayerRef = useRef<ReturnType<typeof makeAudioPlayer> | null>(null);
   const sessionReadyRef = useRef(false);
+  // PTT buffer: audio is captured locally and flushed to WS only on mic release
+  const pttBufferRef = useRef<ArrayBuffer[]>([]);
+  // VAD silence timer — auto-stops recording after sustained silence
+  const vadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vadRafRef = useRef<number | null>(null);
+  // Stable ref so startRecording can call stopRecording without circular deps
+  const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   // When true, incoming audio_chunk frames are discarded (text-input mode)
   const textModeRef = useRef(false);
   // Tracks whether we already emitted the first user bubble for the current voice turn
@@ -157,7 +164,7 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
       setError("Error de conexion con el servidor de voz");
       setStatus("error");
     };
-  }, [onMessage]);
+  }, [onMessage, onUpdateLastUserMessage]);
 
   const disconnect = useCallback(() => {
     socketRef.current?.close();
@@ -173,6 +180,8 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
     hasUserBubbleRef.current = false;
     // Unmute so the next response plays
     audioPlayerRef.current?.unmute();
+    // Clear any leftover PTT buffer from a previous turn
+    pttBufferRef.current = [];
     try {
       const captureCtx = new AudioContext({ sampleRate: 16000 });
       captureCtxRef.current = captureCtx;
@@ -180,17 +189,18 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       streamRef.current = stream;
 
-      // Buffer ~512 ms of audio (8192 samples at 16 kHz) before sending so
-      // whole spoken phrases stay in one chunk and brief pauses don't trigger
-      // premature end-of-utterance detection on the server.
-      // A 'flush' message drains whatever remains when the mic is stopped.
+      // PTT mode: the worklet collects ALL audio into one growing buffer.
+      // Nothing is sent to the WS while recording — we burst everything on mic release.
+      // This gives the server the complete utterance and eliminates ASR hallucinations
+      // caused by partial/incremental audio frames.
       const processorCode = [
         "class PCMProcessor extends AudioWorkletProcessor {",
         "  constructor() {",
         "    super();",
         "    this._buf = []; this._len = 0;",
         "    this.port.onmessage = (e) => {",
-        "      if (e.data === 'flush' && this._len > 0) {",
+        "      if (e.data === 'flush') {",
+        "        if (this._len === 0) return;",
         "        const out = new Int16Array(this._len);",
         "        let off = 0;",
         "        for (const c of this._buf) { out.set(c, off); off += c.length; }",
@@ -206,13 +216,6 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
         "      for (let i = 0; i < ch.length; i++)",
         "        i16[i] = Math.max(-32768, Math.min(32767, ch[i] * 32768));",
         "      this._buf.push(i16); this._len += ch.length;",
-        "      if (this._len >= 8192) {",
-        "        const out = new Int16Array(this._len);",
-        "        let off = 0;",
-        "        for (const c of this._buf) { out.set(c, off); off += c.length; }",
-        "        this.port.postMessage(out.buffer, [out.buffer]);",
-        "        this._buf = []; this._len = 0;",
-        "      }",
         "    }",
         "    return true;",
         "  }",
@@ -227,17 +230,50 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
       const worklet = new AudioWorkletNode(captureCtx, "pcm-processor");
       workletRef.current = worklet;
 
+      // Each message from the worklet is a complete flushed buffer — store locally
       worklet.port.onmessage = (e) => {
-        const ws = socketRef.current;
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "audio_chunk", data: bufferToBase64(e.data) }));
-        }
+        pttBufferRef.current.push(e.data as ArrayBuffer);
       };
 
       source.connect(worklet);
       worklet.connect(captureCtx.destination);
 
-      socketRef.current?.send(JSON.stringify({ type: "start_audio" }));
+      // ── VAD: AnalyserNode watches RMS — if silence > 1500 ms auto-stop ──
+      const VAD_SILENCE_MS = 1500;   // ms of quiet before auto-send
+      const VAD_THRESHOLD = 0.01;   // RMS threshold (0–1); tune up if noisy env
+      const VAD_MIN_SPEECH_MS = 300;  // ignore presses shorter than this
+      const analyser = captureCtx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      const pcmData = new Float32Array(analyser.fftSize);
+      let hasSpeech = false;
+
+      const checkVAD = () => {
+        if (!captureCtxRef.current) return; // recording stopped
+        analyser.getFloatTimeDomainData(pcmData);
+        const rms = Math.sqrt(pcmData.reduce((s, v) => s + v * v, 0) / pcmData.length);
+
+        if (rms > VAD_THRESHOLD) {
+          hasSpeech = true;
+          // Voice detected — cancel any pending silence timer
+          if (vadTimerRef.current) { clearTimeout(vadTimerRef.current); vadTimerRef.current = null; }
+        } else if (hasSpeech) {
+          // Silence after speech — start countdown if not already running
+          if (!vadTimerRef.current) {
+            vadTimerRef.current = setTimeout(() => {
+              vadTimerRef.current = null;
+              if (vadRafRef.current) { cancelAnimationFrame(vadRafRef.current); vadRafRef.current = null; }
+              stopRecordingRef.current?.();
+            }, VAD_SILENCE_MS);
+          }
+        }
+        vadRafRef.current = requestAnimationFrame(checkVAD);
+      };
+
+      // Wait for minimum speech time before activating VAD
+      setTimeout(() => { vadRafRef.current = requestAnimationFrame(checkVAD); }, VAD_MIN_SPEECH_MS);
+
+      // NOTE: we do NOT send start_audio yet — that happens in stopRecording
       setStatus("recording");
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : "Error desconocido";
@@ -247,10 +283,14 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
   }, []);
 
   const stopRecording = useCallback(async () => {
-    // Flush any buffered audio that hasn't reached the chunk threshold yet
+    // Cancel VAD timers
+    if (vadTimerRef.current) { clearTimeout(vadTimerRef.current); vadTimerRef.current = null; }
+    if (vadRafRef.current) { cancelAnimationFrame(vadRafRef.current); vadRafRef.current = null; }
+
+    // 1. Flush whatever audio the worklet still has buffered
     if (workletRef.current) {
       workletRef.current.port.postMessage("flush");
-      // Give the worklet one render quantum (~3 ms) to emit the flush
+      // Give the worklet one render quantum to emit the flush
       await new Promise((r) => setTimeout(r, 50));
       workletRef.current.disconnect();
       workletRef.current = null;
@@ -259,9 +299,26 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
     streamRef.current = null;
     await captureCtxRef.current?.close();
     captureCtxRef.current = null;
-    socketRef.current?.send(JSON.stringify({ type: "stop_audio" }));
+
+    // 2. Now burst the complete utterance to the WS in one go
+    const ws = socketRef.current;
+    if (ws?.readyState === WebSocket.OPEN && pttBufferRef.current.length > 0) {
+      ws.send(JSON.stringify({ type: "start_audio" }));
+      for (const buf of pttBufferRef.current) {
+        ws.send(JSON.stringify({ type: "audio_chunk", data: bufferToBase64(buf) }));
+      }
+      ws.send(JSON.stringify({ type: "stop_audio" }));
+    }
+    pttBufferRef.current = [];
+
     setStatus("idle");
   }, []);
+
+  // Keep ref in sync so startRecording's VAD closure can call stopRecording.
+  // useEffect ensures this runs after render, not during.
+  useEffect(() => {
+    stopRecordingRef.current = stopRecording;
+  }, [stopRecording]);
 
   const toggleMic = useCallback(async () => {
     if (status === "recording") await stopRecording();
