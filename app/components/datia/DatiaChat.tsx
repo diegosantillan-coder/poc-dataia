@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { HomeView } from "./HomeView";
 import { ChatView } from "./ChatView";
 import { Sidebar } from "./Sidebar";
 import { useVoiceChat } from "./useVoiceChat";
+import { useSessions } from "./useSessions";
 import type { Message } from "./types";
 
 export type { Message };
@@ -14,6 +15,11 @@ export function DatiaChat() {
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Stable ID for the current conversation
+  const sessionIdRef = useRef<string | null>(null);
+
+  const { sessions, saveSession, deleteSession } = useSessions();
 
   const addMessage = useCallback((msg: Message) => {
     if (msg.role === "assistant") setIsThinking(false);
@@ -27,6 +33,15 @@ export function DatiaChat() {
   useEffect(() => {
     voiceConnect();
   }, [voiceConnect]);
+
+  // Auto-save to localStorage whenever messages change
+  useEffect(() => {
+    if (messages.length === 0) return;
+    if (!sessionIdRef.current) {
+      sessionIdRef.current = crypto.randomUUID();
+    }
+    saveSession(sessionIdRef.current, messages);
+  }, [messages, saveSession]);
 
   // When stopping the mic (was recording → idle) show thinking indicator
   const voiceToggle = useCallback(async () => {
@@ -47,10 +62,29 @@ export function DatiaChat() {
     setInput("");
     setIsThinking(false);
     setSidebarOpen(false);
+    sessionIdRef.current = null;
   };
 
+  const handleLoadSession = useCallback((id: string) => {
+    const session = sessions.find((s) => s.id === id);
+    if (!session) return;
+    sessionIdRef.current = session.id;
+    setMessages(session.messages);
+    setIsThinking(false);
+    setSidebarOpen(false);
+  }, [sessions]);
+
   if (messages.length === 0) {
-    return <HomeView input={input} onInputChange={setInput} onSubmit={handleSubmit} />;
+    return (
+      <HomeView
+        input={input}
+        onInputChange={setInput}
+        onSubmit={handleSubmit}
+        sessions={sessions}
+        onLoadSession={handleLoadSession}
+        onDeleteSession={deleteSession}
+      />
+    );
   }
 
   return (
@@ -62,7 +96,14 @@ export function DatiaChat() {
         boxShadow: "inset 0px 0px 60px 0px rgba(100, 41, 205, 0.6)",
       }}
     >
-      <Sidebar onNewChat={handleNewChat} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        onNewChat={handleNewChat}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        sessions={sessions}
+        onLoadSession={handleLoadSession}
+        onDeleteSession={deleteSession}
+      />
       <ChatView
         messages={messages}
         input={input}
