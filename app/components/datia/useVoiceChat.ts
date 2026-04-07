@@ -70,6 +70,8 @@ export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const audioPlayerRef = useRef<ReturnType<typeof makeAudioPlayer> | null>(null);
   const sessionReadyRef = useRef(false);
+  // When true, incoming audio_chunk frames are discarded (text-input mode)
+  const textModeRef = useRef(false);
 
   // ── WebSocket connect ───────────────────────────────────────────
   const connect = useCallback(() => {
@@ -91,8 +93,10 @@ export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
         audioPlayerRef.current = makeAudioPlayer(pbCtx, () => setStatus("idle"));
         setStatus("idle");
       } else if (msg.type === "audio_chunk") {
-        audioPlayerRef.current?.enqueue(base64ToBuffer(msg.data));
-        setStatus("speaking");
+        if (!textModeRef.current) {
+          audioPlayerRef.current?.enqueue(base64ToBuffer(msg.data));
+          setStatus("speaking");
+        }
       } else if (msg.type === "transcript") {
         onMessage({ role: msg.role as "user" | "assistant", content: msg.text });
       } else if (msg.type === "session_reconnected") {
@@ -123,6 +127,8 @@ export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
   // ── Mic recording ───────────────────────────────────────────────
   const startRecording = useCallback(async () => {
     if (!sessionReadyRef.current) return;
+    // Switch back to voice mode — audio responses should play
+    textModeRef.current = false;
     try {
       const captureCtx = new AudioContext({ sampleRate: 16000 });
       captureCtxRef.current = captureCtx;
@@ -227,6 +233,7 @@ export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
   const sendText = useCallback((text: string) => {
     const trimmed = text.trim();
     if (!trimmed || !sessionReadyRef.current) return;
+    textModeRef.current = true;
     onMessage({ role: "user", content: trimmed });
     socketRef.current?.send(JSON.stringify({ type: "text_message", text: trimmed }));
   }, [onMessage]);

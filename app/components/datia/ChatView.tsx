@@ -3,6 +3,50 @@ import { ChatInput } from "./ChatInput";
 import type { Message } from "./types";
 import type { VoiceStatus } from "./useVoiceChat";
 
+function ThinkingIndicator() {
+  return (
+    <>
+      <style>{`
+        @keyframes datia-thinking-bounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+          30% { transform: translateY(-7px); opacity: 1; }
+        }
+        @keyframes datia-thinking-glow {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
+        .datia-dot {
+          width: 8px; height: 8px; border-radius: 50%;
+          background: rgba(168, 85, 247, 0.9);
+          animation: datia-thinking-bounce 1.4s ease-in-out infinite;
+        }
+        .datia-dot:nth-child(2) { animation-delay: 0.18s; }
+        .datia-dot:nth-child(3) { animation-delay: 0.36s; }
+      `}</style>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        {/* Pulsing label */}
+        <span
+          style={{
+            fontFamily: "var(--font-poppins), sans-serif",
+            fontSize: "18px",
+            fontWeight: 400,
+            color: "rgba(168, 85, 247, 0.8)",
+            animation: "datia-thinking-glow 1.8s ease-in-out infinite",
+          }}
+        >
+          Pensando
+        </span>
+        {/* Bouncing dots */}
+        <div style={{ display: "flex", alignItems: "center", gap: "5px", paddingBottom: "2px" }}>
+          <div className="datia-dot" />
+          <div className="datia-dot" />
+          <div className="datia-dot" />
+        </div>
+      </div>
+    </>
+  );
+}
+
 interface ChatViewProps {
   messages: Message[];
   input: string;
@@ -11,9 +55,10 @@ interface ChatViewProps {
   voiceStatus?: VoiceStatus;
   onVoiceToggle?: () => void;
   onVoiceConnect?: () => void;
+  isThinking?: boolean;
 }
 
-export function ChatView({ messages, input, onInputChange, onSubmit, voiceStatus, onVoiceToggle, onVoiceConnect }: ChatViewProps) {
+export function ChatView({ messages, input, onInputChange, onSubmit, voiceStatus, onVoiceToggle, onVoiceConnect, isThinking }: ChatViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,6 +110,7 @@ export function ChatView({ messages, input, onInputChange, onSubmit, voiceStatus
             </div>
           )
         )}
+        {isThinking && <ThinkingIndicator />}
         <div ref={bottomRef} />
       </div>
 

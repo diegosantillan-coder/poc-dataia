@@ -12,12 +12,14 @@ export type { Message };
 export function DatiaChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
 
   const addMessage = useCallback((msg: Message) => {
+    if (msg.role === "assistant") setIsThinking(false);
     setMessages((prev) => [...prev, msg]);
   }, []);
 
-  const { status: voiceStatus, connect: voiceConnect, toggleMic: voiceToggle, sendText } =
+  const { status: voiceStatus, connect: voiceConnect, toggleMic: voiceToggleRaw, sendText } =
     useVoiceChat({ onMessage: addMessage });
 
   // Connect to WS on mount
@@ -25,9 +27,16 @@ export function DatiaChat() {
     voiceConnect();
   }, [voiceConnect]);
 
+  // When stopping the mic (was recording → idle) show thinking indicator
+  const voiceToggle = useCallback(async () => {
+    if (voiceStatus === "recording") setIsThinking(true);
+    await voiceToggleRaw();
+  }, [voiceStatus, voiceToggleRaw]);
+
   const handleSubmit = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+    setIsThinking(true);
     sendText(trimmed);
     setInput("");
   };
@@ -35,6 +44,7 @@ export function DatiaChat() {
   const handleNewChat = () => {
     setMessages([]);
     setInput("");
+    setIsThinking(false);
   };
 
   if (messages.length === 0) {
@@ -59,6 +69,7 @@ export function DatiaChat() {
         voiceStatus={voiceStatus}
         onVoiceToggle={voiceToggle}
         onVoiceConnect={voiceConnect}
+        isThinking={isThinking}
       />
     </div>
   );
