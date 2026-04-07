@@ -15,6 +15,8 @@ export type VoiceStatus =
 
 interface UseVoiceChatOptions {
   onMessage: (msg: Message) => void;
+  /** Called when a subsequent user voice transcript chunk arrives — appends to the last user bubble */
+  onUpdateLastUserMessage?: (chunk: string) => void;
 }
 
 // ── Audio player — pure imperative, lives entirely outside React render ──
@@ -60,7 +62,7 @@ function makeAudioPlayer(
   };
 }
 
-export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
+export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceChatOptions) {
   const [status, setStatus] = useState<VoiceStatus>("disconnected");
   const [error, setError] = useState<string | null>(null);
 
@@ -72,6 +74,8 @@ export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
   const sessionReadyRef = useRef(false);
   // When true, incoming audio_chunk frames are discarded (text-input mode)
   const textModeRef = useRef(false);
+  // Tracks whether we already emitted the first user bubble for the current voice turn
+  const hasUserBubbleRef = useRef(false);
 
   // ── WebSocket connect ───────────────────────────────────────────
   const connect = useCallback(() => {
@@ -98,7 +102,21 @@ export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
           setStatus("speaking");
         }
       } else if (msg.type === "transcript") {
-        onMessage({ role: msg.role as "user" | "assistant", content: msg.text });
+        const role = msg.role as "user" | "assistant";
+        if (role === "user") {
+          if (!hasUserBubbleRef.current) {
+            hasUserBubbleRef.current = true;
+            onMessage({ role: "user", content: msg.text });
+          } else {
+            // Subsequent chunks: append to the existing user bubble
+            onUpdateLastUserMessage?.(msg.text);
+          }
+        } else {
+          // Assistant message — do NOT reset hasUserBubbleRef here.
+          // It resets only in startRecording() so late-arriving user chunks
+          // still accumulate into the same bubble and never create a new one mid-turn.
+          onMessage({ role: "assistant", content: msg.text });
+        }
       } else if (msg.type === "session_reconnected") {
         setStatus("idle");
       } else if (msg.type === "error") {
@@ -129,6 +147,8 @@ export function useVoiceChat({ onMessage }: UseVoiceChatOptions) {
     if (!sessionReadyRef.current) return;
     // Switch back to voice mode — audio responses should play
     textModeRef.current = false;
+    // Reset bubble tracker for this new voice turn
+    hasUserBubbleRef.current = false;
     try {
       const captureCtx = new AudioContext({ sampleRate: 16000 });
       captureCtxRef.current = captureCtx;

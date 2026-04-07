@@ -26,8 +26,19 @@ export function DatiaChat() {
     setMessages((prev) => [...prev, msg]);
   }, []);
 
+  const updateLastUserMessage = useCallback((chunk: string) => {
+    setMessages((prev) => {
+      const idx = [...prev].reverse().findIndex((m) => m.role === "user");
+      if (idx === -1) return prev;
+      const realIdx = prev.length - 1 - idx;
+      const next = [...prev];
+      next[realIdx] = { role: "user", content: next[realIdx].content + " " + chunk };
+      return next;
+    });
+  }, []);
+
   const { status: voiceStatus, connect: voiceConnect, toggleMic: voiceToggleRaw, sendText } =
-    useVoiceChat({ onMessage: addMessage });
+    useVoiceChat({ onMessage: addMessage, onUpdateLastUserMessage: updateLastUserMessage });
 
   // Connect to WS on mount
   useEffect(() => {
