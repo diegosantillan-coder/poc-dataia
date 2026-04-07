@@ -8,14 +8,16 @@ const RECENT_CHATS = [
 
 interface SidebarProps {
   onNewChat: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export function Sidebar({ onNewChat }: SidebarProps) {
-  return (
+export function Sidebar({ onNewChat, isOpen = false, onClose }: SidebarProps) {
+  const sidebarContent = (
     <aside
       className="relative flex-shrink-0 flex flex-col h-full"
       style={{
-        width: "394px",
+        width: "clamp(280px, 85vw, 394px)",
         background: "rgba(100, 41, 205, 0.05)",
         borderRight: "1px solid #6429CD",
         boxShadow: "inset 0px 4px 80px 0px rgba(100, 41, 205, 0.25)",
@@ -32,13 +34,8 @@ export function Sidebar({ onNewChat }: SidebarProps) {
       <div className="flex flex-col gap-4 flex-1">
         <button
           type="button"
-          onClick={onNewChat}
-          className="flex items-center gap-3 text-white w-full text-left transition-opacity hover:opacity-70 cursor-pointer"
-          style={{
-            fontFamily: "var(--font-poppins), sans-serif",
-            fontSize: "20px",
-            fontWeight: 400,
-          }}
+          onClick={() => { onNewChat(); onClose?.(); }}
+          className="flex items-center gap-3 text-white w-full text-left transition-opacity hover:opacity-70 cursor-pointer text-base sm:text-lg lg:text-[20px] font-normal"
         >
           <DrawIcon />
           Nuevo chat
@@ -46,12 +43,7 @@ export function Sidebar({ onNewChat }: SidebarProps) {
 
         <button
           type="button"
-          className="flex items-center gap-3 text-white w-full text-left transition-opacity hover:opacity-70 cursor-pointer"
-          style={{
-            fontFamily: "var(--font-poppins), sans-serif",
-            fontSize: "20px",
-            fontWeight: 400,
-          }}
+          className="flex items-center gap-3 text-white w-full text-left transition-opacity hover:opacity-70 cursor-pointer text-base sm:text-lg lg:text-[20px] font-normal"
         >
           <SearchIcon />
           Buscar chat
@@ -59,13 +51,8 @@ export function Sidebar({ onNewChat }: SidebarProps) {
 
         {/* Recientes label */}
         <div
-          className="mt-2"
-          style={{
-            fontFamily: "var(--font-poppins), sans-serif",
-            fontSize: "20px",
-            fontWeight: 400,
-            color: "rgba(180, 150, 255, 0.85)",
-          }}
+          className="mt-2 text-base sm:text-lg lg:text-[20px] font-normal"
+          style={{ color: "rgba(180, 150, 255, 0.85)" }}
         >
           Recientes
         </div>
@@ -75,12 +62,7 @@ export function Sidebar({ onNewChat }: SidebarProps) {
           <button
             key={chat}
             type="button"
-            className="flex items-center gap-3 text-white w-full text-left transition-opacity hover:opacity-70"
-            style={{
-              fontFamily: "var(--font-poppins), sans-serif",
-              fontSize: "20px",
-              fontWeight: 400,
-            }}
+            className="flex items-center gap-3 text-white w-full text-left transition-opacity hover:opacity-70 text-base sm:text-lg lg:text-[20px] font-normal"
           >
             <MoreVertIcon />
             {chat}
@@ -92,16 +74,43 @@ export function Sidebar({ onNewChat }: SidebarProps) {
       <button
         type="button"
         onClick={onNewChat}
-        className="flex items-center gap-3 text-white transition-opacity hover:opacity-70 cursor-pointer"
-        style={{
-          fontFamily: "var(--font-poppins), sans-serif",
-          fontSize: "16px",
-          fontWeight: 400,
-        }}
+        className="flex items-center gap-3 text-white transition-opacity hover:opacity-70 cursor-pointer text-sm sm:text-base font-normal"
       >
         <LogoutIcon />
         Cerrar sesión
       </button>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop: always visible */}
+      <div className="hidden lg:flex h-full">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile: slide-in drawer overlay */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0"
+            style={{ background: "rgba(0,0,0,0.6)" }}
+            onClick={onClose}
+            aria-hidden
+          />
+          {/* Drawer */}
+          <div className="relative z-10 h-full" style={{ animation: "slideInLeft 0.25s ease" }}>
+            {sidebarContent}
+          </div>
+          <style>{`
+            @keyframes slideInLeft {
+              from { transform: translateX(-100%); }
+              to   { transform: translateX(0); }
+            }
+          `}</style>
+        </div>
+      )}
+    </>
   );
 }

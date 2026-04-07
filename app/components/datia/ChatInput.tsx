@@ -45,12 +45,12 @@ export function ChatInput({
         background: "rgba(10, 9, 12, 0.6)",
         border: "1px solid #6429CD",
         borderRadius: "25px",
-        padding: "32px",
+        padding: "clamp(16px, 3vw, 32px)",
         gap: "10px",
       }}
     >
       {/* Input row */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         <button
           type="button"
           className="flex-shrink-0 flex items-center justify-center rounded-full"
@@ -70,12 +70,8 @@ export function ChatInput({
           onKeyDown={handleKeyDown}
           placeholder="Haz una petición para Datia"
           rows={1}
-          className="flex-1 bg-transparent resize-none outline-none text-white overflow-hidden"
+          className="flex-1 bg-transparent resize-none outline-none text-white overflow-hidden text-base sm:text-xl lg:text-[26px] font-normal leading-snug"
           style={{
-            fontFamily: "var(--font-poppins), sans-serif",
-            fontSize: "26px",
-            fontWeight: 400,
-            lineHeight: "1.2",
             caretColor: "white",
           }}
         />

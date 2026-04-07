@@ -13,6 +13,7 @@ export function DatiaChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const addMessage = useCallback((msg: Message) => {
     if (msg.role === "assistant") setIsThinking(false);
@@ -45,6 +46,7 @@ export function DatiaChat() {
     setMessages([]);
     setInput("");
     setIsThinking(false);
+    setSidebarOpen(false);
   };
 
   if (messages.length === 0) {
@@ -60,7 +62,7 @@ export function DatiaChat() {
         boxShadow: "inset 0px 0px 60px 0px rgba(100, 41, 205, 0.6)",
       }}
     >
-      <Sidebar onNewChat={handleNewChat} />
+      <Sidebar onNewChat={handleNewChat} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <ChatView
         messages={messages}
         input={input}
@@ -70,6 +72,7 @@ export function DatiaChat() {
         onVoiceToggle={voiceToggle}
         onVoiceConnect={voiceConnect}
         isThinking={isThinking}
+        onMenuOpen={() => setSidebarOpen(true)}
       />
     </div>
   );

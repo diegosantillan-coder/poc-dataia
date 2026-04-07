@@ -53,13 +53,16 @@ export function LogoutIcon() {
   );
 }
 
-export function DatiaLogo() {
+export function DatiaLogo({ size = "default" }: { size?: "default" | "small" }) {
+  const width = size === "small" ? 110 : 183;
+  const height = size === "small" ? 31 : 51;
   return (
     <img
       src="/logo-pragma.svg"
       alt="Pragma"
-      width={183}
-      height={51}
+      width={width}
+      height={height}
+      style={{ width, height }}
     />
   );
 }
