@@ -101,8 +101,6 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
   const vadRafRef = useRef<number | null>(null);
   // Stable ref so startRecording can call stopRecording without circular deps
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
-  // When true, incoming audio_chunk frames are discarded (text-input mode)
-  const textModeRef = useRef(false);
   // Tracks whether we already emitted the first user bubble for the current voice turn
   const hasUserBubbleRef = useRef(false);
 
@@ -126,10 +124,8 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
         audioPlayerRef.current = makeAudioPlayer(pbCtx, () => setStatus("idle"));
         setStatus("idle");
       } else if (msg.type === "audio_chunk") {
-        if (!textModeRef.current) {
-          audioPlayerRef.current?.enqueue(base64ToBuffer(msg.data));
-          setStatus("speaking");
-        }
+        audioPlayerRef.current?.enqueue(base64ToBuffer(msg.data));
+        setStatus("speaking");
       } else if (msg.type === "transcript") {
         const role = msg.role as "user" | "assistant";
         if (role === "user") {
@@ -175,7 +171,6 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
   const startRecording = useCallback(async () => {
     if (!sessionReadyRef.current) return;
     // Switch back to voice mode — audio responses should play
-    textModeRef.current = false;
     // Reset bubble tracker for this new voice turn
     hasUserBubbleRef.current = false;
     // Unmute so the next response plays
@@ -334,7 +329,6 @@ export function useVoiceChat({ onMessage, onUpdateLastUserMessage }: UseVoiceCha
   const sendText = useCallback((text: string) => {
     const trimmed = text.trim();
     if (!trimmed || !sessionReadyRef.current) return;
-    textModeRef.current = true;
     // Unmute in case user had stopped audio previously
     audioPlayerRef.current?.unmute();
     onMessage({ role: "user", content: trimmed });
