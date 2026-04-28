@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Message } from "./types";
 
-const WS_URL = "wss://d2lgnf5ksfosob.cloudfront.net/ws";
+const WS_URL =
+  process.env.NEXT_PUBLIC_VOICE_WS_URL?.trim() ||
+  "wss://d2lgnf5ksfosob.cloudfront.net/ws";
 
 export type VoiceStatus =
   | "disconnected"
